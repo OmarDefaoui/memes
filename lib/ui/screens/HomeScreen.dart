@@ -14,20 +14,29 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PreloadPageController> controllers = [];
 
   List _memes = [];
-  bool _isError = false, _isDataLoaded = false;
-  int _itemCount = 5;
+  bool _isError = false, _isDataLoaded = false, _isLoadingMore = false;
+  int _totalItems = 0, _itemCount = 5;
 
   @override
   void initState() {
     super.initState();
-    getJsonData();
     controllers = [
-      PreloadPageController(viewportFraction: 0.6, initialPage: 3),
-      PreloadPageController(viewportFraction: 0.6, initialPage: 3),
-      PreloadPageController(viewportFraction: 0.6, initialPage: 3),
-      PreloadPageController(viewportFraction: 0.6, initialPage: 3),
-      PreloadPageController(viewportFraction: 0.6, initialPage: 3),
+      PreloadPageController(viewportFraction: 0.6, initialPage: 1),
+      PreloadPageController(viewportFraction: 0.6, initialPage: 1),
+      PreloadPageController(viewportFraction: 0.6, initialPage: 1),
+      PreloadPageController(viewportFraction: 0.6, initialPage: 1),
+      PreloadPageController(viewportFraction: 0.6, initialPage: 1),
     ];
+    controllers[0].addListener(() {
+      if ((controllers[0].position.pixels ==
+              controllers[0].position.maxScrollExtent) &&
+          !_isLoadingMore &&
+          _totalItems - _itemCount >= 5) {
+        _isLoadingMore = true;
+        _loadMore();
+      }
+    });
+    _getJsonData();
   }
 
   @override
@@ -37,21 +46,24 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Theme.of(context).backgroundColor,
       body: _isError
           ? Center(
-              child: Text('Error'),
+              child: Icon(
+                Icons.error_outline,
+                size: 50,
+              ),
             )
           : _isDataLoaded
               ? PreloadPageView.builder(
-                physics: BouncingScrollPhysics(),
+                  physics: BouncingScrollPhysics(),
                   controller: PreloadPageController(
                     viewportFraction: 0.7,
-                    initialPage: 3,
+                    initialPage: 2,
                   ),
                   itemCount: 5,
                   preloadPagesCount: 5,
                   itemBuilder: (context, mainIndex) {
                     return PreloadPageView.builder(
-                      itemCount: 5,
-                      preloadPagesCount: 5,
+                      itemCount: _itemCount,
+                      preloadPagesCount: _itemCount,
                       controller: controllers[mainIndex],
                       scrollDirection: Axis.vertical,
                       physics: BouncingScrollPhysics(),
@@ -62,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                       itemBuilder: (context, index) {
-                        var memeIndex = (mainIndex * 5) + index;
+                        var memeIndex = (mainIndex * _itemCount) + index;
                         var memeUrl;
                         if (_memes != null) {
                           memeUrl = _memes[memeIndex]['node']['thumbnail_src'];
@@ -80,8 +92,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
                             }
                           },
-                          child: CustomCard(
-                            url: memeUrl,
+                          child: Hero(
+                            tag: memeUrl,
+                            child: CustomCard(
+                              url: memeUrl,
+                              index: index,
+                              memeIndex: memeIndex,
+                            ),
                           ),
                         );
                       },
@@ -94,13 +111,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<String> getJsonData() async {
+  _loadMore() {
+    bool _canLoadMore = (_totalItems - _itemCount * 5) >= 25;
+
+    if (_canLoadMore) {
+      print('load more');
+      setState(() {
+        _itemCount += 5;
+      });
+    }
+    _isLoadingMore = false;
+  }
+
+  Future<String> _getJsonData() async {
     print('fetch data call');
-    var response = await http.get(
+    var response = await http
+        .get(
       Uri.encodeFull(
         'https://www.instagram.com/explore/tags/memesdaily/?__a=1',
       ),
-    );
+    )
+        .catchError((error) {
+      print('error: $error');
+      setState(() {
+        _isError = true;
+      });
+      return 'Error';
+    });
 
     var convertDataToJson;
     try {
@@ -113,10 +150,11 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return "Error";
     } finally {
-      _memes = (convertDataToJson['graphql']['hashtag']['edge_hashtag_to_media']
-          ['edges']);
+      _memes = convertDataToJson['graphql']['hashtag']['edge_hashtag_to_media']
+          ['edges'];
+      _totalItems = _memes.length;
 
-      print(_memes.length.toString());
+      print(_totalItems.toString());
       print(_memes[0]['node']['thumbnail_src']);
 
       setState(() {
