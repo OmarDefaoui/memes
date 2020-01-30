@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'package:firebase_admob/firebase_admob.dart';
 import 'package:flutter/material.dart';
+import 'package:memes/Constants/AdmobId.dart';
 import 'package:memes/ui/screens/ImageScreen.dart';
 import 'package:memes/ui/widget/CustomCard.dart';
+import 'package:memes/utils/ShowAction.dart';
+import 'package:memes/utils/adBuilder.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,6 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List _memes = [];
   bool _isError = false, _isDataLoaded = false, _isLoadingMore = false;
   int _totalItems = 0, _itemCount = 5;
+
+  BannerAd _bannerAd;
+  InterstitialAd _interstitialAd;
 
   @override
   void initState() {
@@ -37,6 +44,15 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     _getJsonData();
+    _initAds();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    _interstitialAd?.dispose();
+    for (int i = 0; i < 5; i++) controllers[i].dispose();
+    super.dispose();
   }
 
   @override
@@ -44,71 +60,117 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       extendBody: true,
       backgroundColor: Theme.of(context).backgroundColor,
-      body: _isError
-          ? Center(
-              child: Icon(
-                Icons.error_outline,
-                size: 50,
-              ),
-            )
-          : _isDataLoaded
-              ? PreloadPageView.builder(
-                  physics: BouncingScrollPhysics(),
-                  controller: PreloadPageController(
-                    viewportFraction: 0.7,
-                    initialPage: 2,
-                  ),
-                  itemCount: 5,
-                  preloadPagesCount: 5,
-                  itemBuilder: (context, mainIndex) {
-                    return PreloadPageView.builder(
-                      itemCount: _itemCount,
-                      preloadPagesCount: _itemCount,
-                      controller: controllers[mainIndex],
-                      scrollDirection: Axis.vertical,
-                      physics: BouncingScrollPhysics(),
-                      onPageChanged: (page) {
-                        _animatePage(
-                          page,
-                          mainIndex,
-                        );
+      body: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: _isError
+                ? Center(
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.refresh,
+                        size: 50,
+                      ),
+                      alignment: Alignment.center,
+                      onPressed: () {
+                        setState(() {
+                          _isError = false;
+                          _isDataLoaded = false;
+                        });
+                        _refreshList();
                       },
-                      itemBuilder: (context, index) {
-                        var memeIndex = (mainIndex * _itemCount) + index;
-                        var memeUrl;
-                        if (_memes != null) {
-                          memeUrl = _memes[memeIndex]['node']['thumbnail_src'];
-                        }
-                        return GestureDetector(
-                          onTap: () {
-                            if (_memes != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ImageScreen(
-                                    url: memeUrl,
+                    ),
+                  )
+                : _isDataLoaded
+                    ? PreloadPageView.builder(
+                        physics: BouncingScrollPhysics(),
+                        controller: PreloadPageController(
+                          viewportFraction: 0.7,
+                          initialPage: 2,
+                        ),
+                        itemCount: 5,
+                        preloadPagesCount: 5,
+                        itemBuilder: (context, mainIndex) {
+                          return RefreshIndicator(
+                            onRefresh: _refreshList,
+                            child: PreloadPageView.builder(
+                              itemCount: _itemCount,
+                              preloadPagesCount: _itemCount,
+                              controller: controllers[mainIndex],
+                              scrollDirection: Axis.vertical,
+                              physics: BouncingScrollPhysics(),
+                              onPageChanged: (page) {
+                                _animatePage(
+                                  page,
+                                  mainIndex,
+                                );
+                              },
+                              itemBuilder: (context, index) {
+                                var memeIndex =
+                                    (mainIndex * _itemCount) + index;
+                                var memeUrl;
+                                memeUrl =
+                                    _memes[memeIndex]['node']['display_url'];
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    try {
+                                      _bannerAd?.dispose();
+                                    } catch (error) {
+                                      print('error closing banner ad: $error');
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ImageScreen(
+                                          url: memeUrl,
+                                          showBanner: showBanner,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Hero(
+                                    tag: memeUrl,
+                                    child: CustomCard(
+                                      url: memeUrl,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Hero(
-                            tag: memeUrl,
-                            child: CustomCard(
-                              url: memeUrl,
-                              index: index,
-                              memeIndex: memeIndex,
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                )
-              : Center(
-                  child: CircularProgressIndicator(),
-                ),
+                          );
+                        },
+                      )
+                    : Center(
+                        child: CircularProgressIndicator(),
+                      ),
+          ),
+          Container(
+            width: double.infinity,
+            alignment: Alignment.topRight,
+            margin: EdgeInsets.all(10),
+            child: SafeArea(
+              child: FloatingActionButton(
+                child: customPopUpMenu(),
+                onPressed: () {},
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<String> _refreshList() async {
+    _memes = [];
+    _isError = false;
+    _isDataLoaded = false;
+    _isLoadingMore = true;
+    _totalItems = 0;
+    _itemCount = 5;
+
+    await _getJsonData();
+    _isLoadingMore = false;
+    return 'Success';
   }
 
   _loadMore() {
@@ -155,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _totalItems = _memes.length;
 
       print(_totalItems.toString());
-      print(_memes[0]['node']['thumbnail_src']);
+      print(_memes[0]['node']['display_url']);
 
       setState(() {
         _isDataLoaded = true;
@@ -176,5 +238,24 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+  }
+
+  _initAds() {
+    FirebaseAdMob.instance.initialize(appId: admobAppId);
+
+    Future.delayed(const Duration(seconds: 1), () {
+      showBanner();
+
+      _interstitialAd = createInterstitialAd(1)
+        ..load()
+        ..show();
+    });
+  }
+
+  showBanner() {
+    print('show banner call');
+    _bannerAd = createBannerAd(1)
+      ..load()
+      ..show();
   }
 }

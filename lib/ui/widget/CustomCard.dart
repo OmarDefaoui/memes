@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 
 class CustomCard extends StatefulWidget {
   final String url;
-  final int index, memeIndex;
+  final int memeIndex;
   CustomCard({
     @required this.url,
-    this.index,
     this.memeIndex,
   });
 
@@ -20,8 +19,9 @@ class _CustomCardState extends State<CustomCard> {
     return Card(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4.0),
+        borderRadius: BorderRadius.circular(15.0),
       ),
+      elevation: 4,
       child: Stack(
         children: <Widget>[
           Container(
@@ -31,26 +31,6 @@ class _CustomCardState extends State<CustomCard> {
             ),
             width: double.infinity,
             height: double.infinity,
-          ),
-          Positioned.fill(
-            child: Container(
-              alignment: Alignment.bottomCenter,
-              child: Text(
-                '${widget.index}: ${widget.memeIndex}',
-                style: TextStyle(
-                  fontSize: 22,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    BoxShadow(
-                      blurRadius: 25,
-                      color: Colors.black,
-                      offset: Offset(0.2, 0.2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
         ],
       ),

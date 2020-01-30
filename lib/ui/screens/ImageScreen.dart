@@ -5,12 +5,17 @@ import 'package:esys_flutter_share/esys_flutter_share.dart';
 import 'package:flutter/material.dart';
 import 'package:gallery_saver/gallery_saver.dart';
 import 'package:memes/Constants/Constants.dart';
+import 'package:memes/utils/ShowAction.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:screenshot/screenshot.dart';
 
 class ImageScreen extends StatefulWidget {
+  final VoidCallback showBanner;
   final String url;
-  ImageScreen({this.url});
+  ImageScreen({
+    this.url,
+    this.showBanner,
+  });
 
   @override
   _ImageScreenState createState() => _ImageScreenState();
@@ -32,127 +37,144 @@ class _ImageScreenState extends State<ImageScreen>
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).primaryColor,
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Stack(
-              children: <Widget>[
-                Screenshot(
-                  controller: screenshotController,
-                  child: Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_controller.isCompleted) {
-                          _controller.reverse();
-                        } else {
-                          _controller.forward();
-                        }
-                      },
-                      child: Hero(
-                        tag: widget.url,
-                        child: CachedNetworkImage(
-                          imageUrl: widget.url,
-                          fit: BoxFit.contain,
+      backgroundColor: Theme.of(context).backgroundColor,
+      body: WillPopScope(
+        onWillPop: _onWillPop,
+        child: SafeArea(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Stack(
+                children: <Widget>[
+                  Screenshot(
+                    controller: screenshotController,
+                    child: Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_controller.isCompleted) {
+                            _controller.reverse();
+                          } else {
+                            _controller.forward();
+                          }
+                        },
+                        child: Hero(
+                          tag: widget.url,
+                          child: CachedNetworkImage(
+                            imageUrl: widget.url,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Transform.translate(
-                        offset: Offset(0, -_controller.value * 64),
-                        child: Container(
-                          height: 64.0,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.only(
-                              bottomLeft: Radius.circular(8.0),
-                              bottomRight: Radius.circular(8.0),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).primaryColor,
-                                blurRadius: 5.0,
-                              ),
-                            ],
-                          ),
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: <Widget>[
+                        Transform.translate(
+                          offset: Offset(0, -_controller.value * 64),
                           child: Container(
-                            padding: const EdgeInsets.only(left: 8.0),
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              icon: Icon(Icons.arrow_back),
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                      Transform.translate(
-                        offset: Offset(0, _controller.value * 64),
-                        child: Container(
-                          height: 64.0,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(16.0),
-                              topRight: Radius.circular(16.0),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).primaryColor,
-                                blurRadius: 5.0,
+                            height: 64.0,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(8.0),
+                                bottomRight: Radius.circular(8.0),
                               ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: _isLoading
-                                ? Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    mainAxisSize: MainAxisSize.max,
-                                    children: <Widget>[
-                                      IconButton(
-                                        icon: Icon(
-                                          _isSavedToGallery
-                                              ? Icons.check_circle_outline
-                                              : Icons.save,
-                                        ),
-                                        onPressed: _isSavedToGallery
-                                            ? () {}
-                                            : _askForPermission,
-                                      ),
-                                      IconButton(
-                                        icon: Icon(Icons.share),
-                                        onPressed: _shareImage,
-                                      ),
-                                    ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context).primaryColor,
+                                  blurRadius: 5.0,
+                                ),
+                              ],
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: <Widget>[
+                                  IconButton(
+                                    icon: Icon(Icons.arrow_back),
+                                    onPressed: () {
+                                      widget.showBanner();
+                                      Navigator.pop(context);
+                                    },
                                   ),
+                                  customPopUpMenu(),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        Transform.translate(
+                          offset: Offset(0, _controller.value * 64),
+                          child: Container(
+                            height: 64.0,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(16.0),
+                                topRight: Radius.circular(16.0),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context).primaryColor,
+                                  blurRadius: 5.0,
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: _isLoading
+                                  ? Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      mainAxisSize: MainAxisSize.max,
+                                      children: <Widget>[
+                                        IconButton(
+                                          icon: Icon(
+                                            _isSavedToGallery
+                                                ? Icons.check_circle_outline
+                                                : Icons.save,
+                                          ),
+                                          onPressed: _isSavedToGallery
+                                              ? () {}
+                                              : _askForPermission,
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.share),
+                                          onPressed: _shareImage,
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -247,5 +269,10 @@ class _ImageScreenState extends State<ImageScreen>
             ],
           );
         });
+  }
+
+  Future<bool> _onWillPop() async {
+    widget.showBanner();
+    return true;
   }
 }
