@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:esys_flutter_share/esys_flutter_share.dart';
 import 'package:flutter/material.dart';
-import 'package:gallery_saver/gallery_saver.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:memes/Constants/Constants.dart';
+import 'package:memes/utils/SetWallpaper.dart';
 import 'package:memes/utils/ShowAction.dart';
+import 'package:gallery_saver/gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:screenshot/screenshot.dart';
 
@@ -26,6 +28,11 @@ class _ImageScreenState extends State<ImageScreen>
   AnimationController _controller;
   ScreenshotController screenshotController = ScreenshotController();
   bool _isLoading = false, _isSavedToGallery = false;
+
+  //for setting wallpaper
+  Stream<String> progressString;
+  String res;
+  bool downloading = false;
 
   @override
   void initState() {
@@ -84,7 +91,7 @@ class _ImageScreenState extends State<ImageScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
                         Transform.translate(
-                          offset: Offset(0, -_controller.value * 64),
+                          offset: Offset(0, -_controller.value * 100),
                           child: Container(
                             height: 64.0,
                             width: double.infinity,
@@ -97,13 +104,13 @@ class _ImageScreenState extends State<ImageScreen>
                               boxShadow: [
                                 BoxShadow(
                                   color: Theme.of(context).primaryColor,
-                                  blurRadius: 5.0,
+                                  blurRadius: 2.0,
                                 ),
                               ],
                             ),
                             child: Container(
                               padding: const EdgeInsets.only(left: 8.0),
-                              alignment: Alignment.centerLeft,
+                              alignment: Alignment.center,
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -115,7 +122,21 @@ class _ImageScreenState extends State<ImageScreen>
                                       Navigator.pop(context);
                                     },
                                   ),
-                                  customPopUpMenu(),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      Container(
+                                        height: 64.0,
+                                        padding:
+                                            const EdgeInsets.only(right: 8.0),
+                                        child: FlatButton(
+                                          child: Text('Set as wallpaper'),
+                                          onPressed: _showWallpaperDialog,
+                                        ),
+                                      ),
+                                      customPopUpMenu(),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -134,7 +155,7 @@ class _ImageScreenState extends State<ImageScreen>
                               boxShadow: [
                                 BoxShadow(
                                   color: Theme.of(context).primaryColor,
-                                  blurRadius: 5.0,
+                                  blurRadius: 2.0,
                                 ),
                               ],
                             ),
@@ -171,6 +192,7 @@ class _ImageScreenState extends State<ImageScreen>
                       ],
                     ),
                   ),
+                  _showProgressDialog(),
                 ],
               );
             },
@@ -274,5 +296,140 @@ class _ImageScreenState extends State<ImageScreen>
   Future<bool> _onWillPop() async {
     widget.showBanner();
     return true;
+  }
+
+  void _showWallpaperDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Set a wallpaper',
+                  style: TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              ListTile(
+                title: Text(
+                  'Home Screen',
+                  style: TextStyle(color: Colors.black),
+                ),
+                leading: Icon(
+                  Icons.home,
+                  color: Colors.black,
+                ),
+                onTap: () => _setWallpaper(1),
+              ),
+              ListTile(
+                title: Text(
+                  'Lock Screen',
+                  style: TextStyle(color: Colors.black),
+                ),
+                leading: Icon(
+                  Icons.lock,
+                  color: Colors.black,
+                ),
+                onTap: () => _setWallpaper(2),
+              ),
+              ListTile(
+                title: Text(
+                  'Both',
+                  style: TextStyle(color: Colors.black),
+                ),
+                leading: Icon(
+                  Icons.phone_android,
+                  color: Colors.black,
+                ),
+                onTap: () => _setWallpaper(3),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _setWallpaper(int wallpaperType) async {
+    Navigator.pop(context, false);
+    progressString = SetWallpaper.imageDownloadProgress(widget.url);
+    progressString.listen((data) {
+      setState(() {
+        res = data;
+        downloading = true;
+      });
+      print("DataReceived: " + data);
+    }, onDone: () async {
+      switch (wallpaperType) {
+        case 1: //home screen
+          await SetWallpaper.homeScreen();
+          break;
+        case 2: //lock screen
+          await SetWallpaper.lockScreen();
+          break;
+        case 3: //both
+          await SetWallpaper.bothScreen();
+          break;
+      }
+      setState(() {
+        downloading = false;
+      });
+      _showToast('Wallpaper set successfully');
+      print("Task Done");
+    }, onError: (error) {
+      setState(() {
+        downloading = false;
+      });
+      _showToast('Error');
+      print("Some Error");
+    });
+  }
+
+  Widget _showProgressDialog() {
+    return Positioned.fill(
+      child: Center(
+        child: downloading
+            ? Container(
+                height: 120.0,
+                width: 200.0,
+                child: Card(
+                  color: Color(0xff323639),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      CircularProgressIndicator(),
+                      SizedBox(height: 20.0),
+                      Text(
+                        "Downloading File : $res",
+                        style: TextStyle(color: Colors.white),
+                      )
+                    ],
+                  ),
+                ),
+              )
+            : SizedBox.shrink(),
+      ),
+    );
+  }
+
+  _showToast(String text) {
+    Fluttertoast.showToast(
+      msg: text,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.CENTER,
+      timeInSecForIos: 1,
+      backgroundColor: Colors.white,
+      textColor: Colors.black,
+      fontSize: 16.0,
+    );
   }
 }
