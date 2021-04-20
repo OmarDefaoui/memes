@@ -3,9 +3,9 @@
 Funny daily Memes app gives you the most funny images of 2021, to enjoy and brighten your day
 The most funny images of the moment witch you can save or share it with your firends. This memes app have also various humorous jokes.
 
--You can save the images in your phone gallery
--Set an image as wallpaper
--Refresh to see fresh new memes
+-You can save the images in your phone gallery<br>
+-Set an image as wallpaper<br>
+-Refresh to see fresh new memes<br>
 -Share memes with your family and friends and in your social networks
 
 Come on guys and download this awesome Daily Memes app.
